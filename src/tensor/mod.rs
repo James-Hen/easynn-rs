@@ -10,13 +10,23 @@ pub mod num;
 pub use num::NumT;
 
 /// Tensor: a generic describing a RANK-ranked tensor.
+#[derive(Debug)]
 pub struct Tensor<T: NumT, const RANK: usize> {
     pub(crate) flattened: Vec<T>,
     pub(crate) shape: Shape<RANK>,
 }
 
+impl<T: NumT, const RANK: usize> PartialEq for Tensor<T, RANK> {
+    fn eq(&self, other: &Tensor<T, RANK>) -> bool {
+        if self.shape != other.shape {
+            return false;
+        }
+        self.flattened == other.flattened
+    }
+}
+
 pub mod error;
-pub use error::OutOfBondError;
+pub use error::{ OutOfBondError, ShapeMismatchError };
 type Result<T> = std::result::Result<T, OutOfBondError>;
 
 impl<T: NumT, const RANK: usize> Tensor<T, RANK> {
@@ -43,8 +53,20 @@ impl<T: NumT, const RANK: usize> Tensor<T, RANK> {
         Ok(ind)
     }
 
-    pub fn zeros(shape: Shape<RANK>) -> Tensor<T, RANK> {
-        Tensor::<T, RANK> { flattened: vec![T::zero(); shape.size()], shape: shape, }
+    pub fn new(shape: &Shape<RANK>, flattened: Vec<T>) -> std::result::Result<Self, ShapeMismatchError> {
+        if flattened.len() != shape.size() {
+            return Err(ShapeMismatchError)
+        }
+        Ok(Tensor {
+            flattened: flattened,
+            shape: shape.clone(),
+        })
+    }
+    pub fn zeros(shape: &Shape<RANK>) -> Self {
+        Tensor::<T, RANK> { flattened: vec![T::zero(); shape.size()], shape: shape.clone(), }
+    }
+    pub fn ones(shape: &Shape<RANK>) -> Self {
+        Tensor::<T, RANK> { flattened: vec![T::one(); shape.size()], shape: shape.clone(), }
     }
     pub fn get(&self, at: Index<RANK>) -> Result<T> {
         let pos = self.index2pos(at)?;

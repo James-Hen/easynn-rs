@@ -16,3 +16,5 @@ keywords = ["neural-network", "CNN", "RNN", "DNN", "backpropagation", "parallel"
 
 [dependencies]
 num-traits = "*"
+crossbeam = "*"
+num_cpus = "*"

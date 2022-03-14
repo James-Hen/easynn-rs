@@ -1,9 +1,14 @@
 extern crate num_traits;
-pub use num_traits::{ NumOps, NumAssignOps };
+use num_traits::{ NumOps, NumAssignOps };
+use num_traits::identities::{ One, Zero };
 
-pub use num_traits::identities::{ One, Zero };
+use std::marker::{ Send, Sync };
+use std::fmt::Debug;
 
-pub trait NumT: PartialEq + Zero + One + NumOps + NumAssignOps + Copy {}
+pub trait NumT:
+    PartialEq + Zero + One + NumOps + NumAssignOps
+    + Copy + Send + Sync + Debug
+{ }
 
 macro_rules! int_trait_impl {
     ($name:ident for $($t:ty)*) => ($(
