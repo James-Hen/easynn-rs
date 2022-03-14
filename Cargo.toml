@@ -12,7 +12,7 @@ description = """
 A rust crate for quick-and-dirty neuro network developing and training
 """
 
-keywords = ["neural-network", "CNN", "RNN", "DNN", "backpropagation", "parallel" ,"machine-learning"]
+keywords = ["CNN/RNN/DNN", "backpropagation", "parallel" ,"machine-learning"]
 
 [dependencies]
 num-traits = "*"
