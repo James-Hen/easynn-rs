@@ -25,7 +25,7 @@ pub struct Dense<T: NumT, const INPUT_RANK: usize, const OUTPUT_RANK: usize> {
 }
 
 impl<T: NumT, const INPUT_RANK: usize, const OUTPUT_RANK: usize>
-    Layer<T, INPUT_RANK, T, OUTPUT_RANK> for Dense<T, INPUT_RANK, OUTPUT_RANK>
+    Layer<T, T, INPUT_RANK, OUTPUT_RANK> for Dense<T, INPUT_RANK, OUTPUT_RANK>
 {
     fn predict(&self, input: &Tensor<T, INPUT_RANK>) -> Result<Tensor<T, OUTPUT_RANK>> {
         if input.shape != self.input_shape {
