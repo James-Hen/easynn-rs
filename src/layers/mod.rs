@@ -1,6 +1,7 @@
 //! The layers module
 
 pub mod dense;
+pub mod activation;
 
 pub use crate::tensor::*;
 pub use crate::tensor::error::ShapeMismatchError;

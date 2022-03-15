@@ -1,4 +1,5 @@
 use crate::layers::*;
+use crate::layers::activation::*;
 
 extern crate crossbeam;
 extern crate num_cpus;
@@ -21,10 +22,11 @@ pub struct Dense<T: NumT> {
     output_shape: Shape,
     weight: Vec<T>,
     bias: Vec<T>,
+    activation: Activation<T>,
 }
 
 impl<T: NumT> Dense<T> {
-    pub fn new(i_shape: &Shape, o_shape: &Shape) -> Self {
+    pub fn new(i_shape: &Shape, o_shape: &Shape, act: Activation<T>) -> Self {
         let ilen = i_shape.size();
         let olen = o_shape.size();
         Dense::<T> {
@@ -32,6 +34,7 @@ impl<T: NumT> Dense<T> {
             output_shape: o_shape.clone(),
             weight: vec![T::one(); ilen * olen],
             bias: vec![T::one(); olen],
+            activation: act,
         }
     }
 }
@@ -58,6 +61,7 @@ impl<T: NumT> Layer<T> for Dense<T> {
                             for (k, &w) in w_chk[j*ilen..(j+1)*ilen].into_iter().enumerate() {
                                 *o += w * input.flattened[k];
                             }
+                            *o = self.activation.call(*o);
                         }
                     });
                 }
@@ -69,19 +73,20 @@ impl<T: NumT> Layer<T> for Dense<T> {
 
 #[test]
 fn test_dense_predict() {
-    let input = Tensor::<isize>::new(&Shape::new([2, 3]), vec![
-        1, 7, 8,
-        -2, 3, 5,
+    let input = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
+        1., 7., 8.,
+        -2., 3., 5.,
     ]).unwrap();
-    let l = Dense::<isize> {
+    let l = Dense::<f64> {
         input_shape: Shape::new([2, 3]),
         output_shape: Shape::new([2]),
         weight: vec![
-            2, 1, -1, 3, 2, 1,
-            1, 0, 0, -2, 1, 0,
+            2., 1., -1., 3., 2., 1.,
+            1., 0., 0., -2., 1., 0.,
         ],
-        bias: vec![-5, -1],
+        bias: vec![-5., -1.],
+        activation: Activation::<f64>::No,
     };
-    let output = Tensor::<isize>::new(&Shape::new([2]), vec![1, 7]).unwrap();
+    let output = Tensor::<f64>::new(&Shape::new([2]), vec![1., 7.]).unwrap();
     assert_eq!(l.predict(&input).unwrap(), output);
 }

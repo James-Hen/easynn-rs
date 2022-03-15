@@ -33,15 +33,16 @@ fn test_sequential_predict() {
     let hid_shape =Shape::new([3]);
     let o_shape = Shape::new([2]);
 
-    let input = Tensor::<isize>::new(&i_shape, vec![
-        1, 7, 8,
-        -2, 3, 5,
+    let input = Tensor::<f64>::new(&i_shape, vec![
+        1., 7., 8.,
+        -2., 3., 5.,
     ]).unwrap();
-    let output = Tensor::<isize>::new(&o_shape, vec![70, 70]).unwrap();
+    let output = Tensor::<f64>::new(&o_shape, vec![70., 70.]).unwrap();
 
-    let mut nn = Sequential::<isize>::new();
-    nn.add(crate::layers::dense::Dense::<isize>::new(&i_shape, &hid_shape));
-    nn.add(crate::layers::dense::Dense::<isize>::new(&hid_shape, &o_shape));
+    let mut nn = Sequential::<f64>::new();
+    use crate::layers::activation::Activation::*;
+    nn.add(crate::layers::dense::Dense::<f64>::new(&i_shape, &hid_shape, No));
+    nn.add(crate::layers::dense::Dense::<f64>::new(&hid_shape, &o_shape, Relu));
 
     assert_eq!(nn.predict(&input).unwrap(), output);
 }
