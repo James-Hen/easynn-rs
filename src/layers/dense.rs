@@ -69,6 +69,19 @@ impl<T: NumT> Layer<T> for Dense<T> {
         }
         Ok(output)
     }
+    fn backpropagate_delta(&self, delta: &Tensor<T>) -> Result<Tensor<T>> {
+        if delta.shape != self.output_shape {
+            return Err(ShapeMismatchError);
+        }
+        let mut lst_delta = Tensor::<T>::zeros(&self.input_shape);
+        Ok(lst_delta)
+    }
+    fn descend(&mut self, rate: T, delta: &Tensor<T>, a: &Tensor<T>) -> Result<()> {
+        if delta.shape != self.output_shape {
+            return Err(ShapeMismatchError);
+        }
+        Ok(())
+    }
 }
 
 #[test]
