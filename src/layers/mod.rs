@@ -1,3 +1,5 @@
+//! The layers module
+
 pub mod dense;
 
 pub use crate::tensor::*;

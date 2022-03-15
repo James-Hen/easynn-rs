@@ -3,23 +3,22 @@ use crate::layers::*;
 extern crate crossbeam;
 extern crate num_cpus;
 
+/// Weight are arranged in flattened style:
+/// every i^th consecutive (size) items are the weight
+/// of the input tensor to the i^th one in the output tensor,
+/// e.g.:
+///
+///  - input: `[01,02;11,12]`
+///  - output: `[21,22;31,32]`
+///  - weight: `[21~01,21~02,21~11,21~12;22~01,22~02,22~11,22~12;...;...]`
+///  - bias: `[21,22;31;32]`
+///
+/// When processed in parallel, each output coordinates a `mult`,
+/// and each `chunk` includes many `mult`.
 #[derive(Debug)]
 pub struct Dense<T: NumT, const INPUT_RANK: usize, const OUTPUT_RANK: usize> {
     input_shape: Shape<INPUT_RANK>,
     output_shape: Shape<OUTPUT_RANK>,
-
-    /// Weight are arranged in flattened style:
-    /// every i^th consecutive (size) items are the weight
-    /// of the input tensor to the i^th one in the output tensor,
-    /// e.g.:
-    ///
-    ///  - input: `[01,02;11,12]`
-    ///  - output: `[21,22;31,32]`
-    ///  - weight: `[21~01,21~02,21~11,21~12;22~01,22~02,22~11,22~12;...;...]`
-    ///  - bias: `[21,22;31;32]`
-    ///
-    /// When processed in parallel, each output coordinates a `mult`,
-    /// and each `chunk` includes many `mult`.
     weight: Vec<T>,
     bias: Vec<T>,
 }

@@ -1,6 +1,6 @@
 [package]
 name = "easynn"
-version = "0.1.0-alpha"
+version = "0.1.1-alpha"
 edition = "2021"
 authors = ["Junyang Zhang <mail@junyang.me>"]
 repository = "https://github.com/junyang-zh/easynn-rs"
@@ -9,7 +9,7 @@ license = "MIT"
 readme = "README.md"
 
 description = """
-A rust crate for quick-and-dirty neuro network developing and training
+(Pre-alpha) A rust crate for quick-and-dirty neuro network developing and training.
 """
 
 keywords = ["CNN-RNN-DNN", "backpropagation", "parallel" ,"machine-learning"]

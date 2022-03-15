@@ -1,3 +1,6 @@
+//! The tensor module
+//!
+
 pub mod shape;
 pub use shape::{ Shape, ShapeTrait };
 
