@@ -16,21 +16,32 @@ extern crate num_cpus;
 /// When processed in parallel, each output coordinates a `mult`,
 /// and each `chunk` includes many `mult`.
 #[derive(Debug)]
-pub struct Dense<T: NumT, const INPUT_RANK: usize, const OUTPUT_RANK: usize> {
-    input_shape: Shape<INPUT_RANK>,
-    output_shape: Shape<OUTPUT_RANK>,
+pub struct Dense<T: NumT> {
+    input_shape: Shape,
+    output_shape: Shape,
     weight: Vec<T>,
     bias: Vec<T>,
 }
 
-impl<T: NumT, const INPUT_RANK: usize, const OUTPUT_RANK: usize>
-    Layer<T, T, INPUT_RANK, OUTPUT_RANK> for Dense<T, INPUT_RANK, OUTPUT_RANK>
-{
-    fn predict(&self, input: &Tensor<T, INPUT_RANK>) -> Result<Tensor<T, OUTPUT_RANK>> {
+impl<T: NumT> Dense<T> {
+    pub fn new(i_shape: &Shape, o_shape: &Shape) -> Self {
+        let ilen = i_shape.size();
+        let olen = o_shape.size();
+        Dense::<T> {
+            input_shape: i_shape.clone(),
+            output_shape: o_shape.clone(),
+            weight: vec![T::one(); ilen * olen],
+            bias: vec![T::one(); olen],
+        }
+    }
+}
+
+impl<T: NumT> Layer<T> for Dense<T> {
+    fn predict(&self, input: &Tensor<T>) -> Result<Tensor<T>> {
         if input.shape != self.input_shape {
             return Err(ShapeMismatchError);
         }
-        let mut output = Tensor::<T, OUTPUT_RANK>::zeros(&self.output_shape);
+        let mut output = Tensor::<T>::zeros(&self.output_shape);
         let olen = output.flattened.len();
         let ilen = input.flattened.len();
 
@@ -58,19 +69,19 @@ impl<T: NumT, const INPUT_RANK: usize, const OUTPUT_RANK: usize>
 
 #[test]
 fn test_dense_predict() {
-    let input = Tensor::<isize, 2>::new(&[2, 3], vec![
+    let input = Tensor::<isize>::new(&Shape::new([2, 3]), vec![
         1, 7, 8,
         -2, 3, 5,
     ]).unwrap();
-    let l = Dense::<isize, 2, 1> {
-        input_shape: [2, 3],
-        output_shape: [2],
+    let l = Dense::<isize> {
+        input_shape: Shape::new([2, 3]),
+        output_shape: Shape::new([2]),
         weight: vec![
             2, 1, -1, 3, 2, 1,
             1, 0, 0, -2, 1, 0,
         ],
         bias: vec![-5, -1],
     };
-    let output = Tensor::<isize, 1>::new(&[2], vec![1, 7]).unwrap();
+    let output = Tensor::<isize>::new(&Shape::new([2]), vec![1, 7]).unwrap();
     assert_eq!(l.predict(&input).unwrap(), output);
 }

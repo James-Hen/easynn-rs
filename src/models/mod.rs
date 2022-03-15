@@ -3,6 +3,8 @@
 
 pub mod sequential;
 
-pub trait Nn {
-    
+use crate::layers::*;
+
+pub trait Model<T: NumT>  {
+    fn predict(&self, input: &Tensor<T>) -> Result<Tensor<T>>;
 }

@@ -1,3 +1,5 @@
+/// Errors that may occur while manipulating tensors
+
 use std::fmt;
 
 #[derive(Debug, Clone)]

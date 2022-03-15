@@ -1,3 +1,6 @@
+/// NumT trait is implemented for the numeric types that
+/// are accepted to be contained in a tensor.
+
 extern crate num_traits;
 use num_traits::{ NumOps, NumAssignOps };
 use num_traits::identities::{ One, Zero };

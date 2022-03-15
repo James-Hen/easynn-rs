@@ -1,17 +1,37 @@
-/// Shape: describes the shape of a tensor given the rank RANK,
-/// which is the dimention count of the tensor.
-pub type Shape<const RANK: usize> = [usize; RANK];
+use std::ops::Index;
 
-/// ShapeTrait: gives an easy way to get the total memory size
-/// of a shape.
-pub trait ShapeTrait<const RANK: usize> {
-    fn size(&self) -> usize;
+/// Shape: describes the shape of a tensor given the rank,
+/// which is the dimention count of the tensor.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Shape {
+    bound: Vec<usize>,
 }
-impl<const RANK: usize> ShapeTrait<RANK> for Shape<RANK> {
-    fn size(&self) -> usize {
+
+impl Index<usize> for Shape {
+    type Output = usize;
+    fn index(&self, ind: usize) -> &Self::Output {
+        &self.bound[ind]
+    }
+}
+
+impl Shape {
+    /// Create a Shape object described by an array
+    pub fn new<const RANK: usize>(s: [usize; RANK]) -> Self {
+        Shape { bound: s.to_vec() }
+    }
+
+    /// Return the element counts of the tensor in memory,
+    /// e.g.:
+    /// 
+    /// ```rust
+    ///     use easynn::tensor::Shape;
+    ///     let s = Shape::new([2, 3, 5]);
+    ///     assert_eq!(s.size(), 30_usize);
+    /// ```
+    pub fn size(&self) -> usize {
         let mut ret: usize = 1;
-        for bound in self {
-            ret *= bound;
+        for b in &self.bound {
+            ret *= b;
         }
         ret
     }
