@@ -57,7 +57,7 @@ impl<T: NumT> Activation<T> {
             Tanh => tanh::<T>(x),
             Relu => relu::<T>(x),
             LeakyRelu(a) => leaky_relu::<T>(*a, x),
-            _ => T::zero(),
+            // _ => T::zero(),
         }
     }
     pub fn diff(&self, x: T) -> T {
@@ -67,7 +67,7 @@ impl<T: NumT> Activation<T> {
             Tanh => dtanh::<T>(x),
             Relu => drelu::<T>(x),
             LeakyRelu(a) => dleaky_relu::<T>(*a, x),
-            _ => T::zero(),
+            // _ => T::zero(),
         }
     }
 }

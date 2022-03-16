@@ -5,7 +5,7 @@ extern crate crossbeam;
 extern crate num_cpus;
 
 /// Weight are arranged in flattened style:
-/// every i^th consecutive (size) items are the weight
+/// every i^th consecutive (input size) items are the weight
 /// of the input tensor to the i^th one in the output tensor,
 /// e.g.:
 ///
@@ -16,6 +16,7 @@ extern crate num_cpus;
 ///
 /// When processed in parallel, each output coordinates a `mult`,
 /// and each `chunk` includes many `mult`.
+/// 
 #[derive(Debug)]
 pub struct Dense<T: NumT> {
     input_shape: Shape,
@@ -39,8 +40,21 @@ impl<T: NumT> Dense<T> {
     }
 }
 
+/// Helpers like `slice_iter(w, len, j)` is implemented to access the weight slice j,
+/// containing len(== input length) elements
+macro_rules! slice_iter {
+    ($w: expr, $len: expr, $j: expr) => {
+        $w[$j*$len..($j+1)*$len].into_iter()
+    }
+}
+macro_rules! slice_iter_mut {
+    ($w: expr, $len: expr, $j: expr) => {
+        $w[$j*$len..($j+1)*$len].iter_mut()
+    }
+}
+
 impl<T: NumT> Layer<T> for Dense<T> {
-    fn predict(&self, input: &Tensor<T>) -> Result<Tensor<T>> {
+    fn forward_propagate(&self, input: &Tensor<T>, activate: bool) -> Result<Tensor<T>> {
         if input.shape != self.input_shape {
             return Err(ShapeMismatchError);
         }
@@ -58,10 +72,13 @@ impl<T: NumT> Layer<T> for Dense<T> {
                     spawner.spawn(move |_| {
                         for (j, o) in o_chk.into_iter().enumerate() {
                             *o = self.bias[i*mults_per_chunk + j];
-                            for (k, &w) in w_chk[j*ilen..(j+1)*ilen].into_iter().enumerate() {
+                            // Do o = input.dot(w_chk[j])
+                            for (k, &w) in slice_iter!(w_chk, ilen, j).enumerate() {
                                 *o += w * input.flattened[k];
                             }
-                            *o = self.activation.call(*o);
+                            if activate {
+                                *o = self.activation.call(*o);
+                            }
                         }
                     });
                 }
@@ -69,11 +86,56 @@ impl<T: NumT> Layer<T> for Dense<T> {
         }
         Ok(output)
     }
-    fn backpropagate_delta(&self, delta: &Tensor<T>) -> Result<Tensor<T>> {
-        if delta.shape != self.output_shape {
+    fn backpropagate_delta(&self, delta: &Tensor<T>, a_lst: &Tensor<T>, sigma_lst: &Activation<T>) -> Result<Tensor<T>> {
+        if delta.shape != self.output_shape || a_lst.shape != self.input_shape {
             return Err(ShapeMismatchError);
         }
+        let ilen = self.input_shape.size();
+        let dlen = delta.flattened.len();
+
+        // calculate products of weight and delta, to be sumed
+        let mut prod = vec![T::zero(); self.weight.len()];
+        let threads = num_cpus::get();
+        let mults_per_chunk = dlen / threads + 1;
+        {
+            let d_chunks = delta.flattened.chunks(mults_per_chunk); // delta chunk
+            let w_chunks = self.weight.chunks(mults_per_chunk * ilen); // weight chunk
+            let p_chunks = prod.chunks_mut(mults_per_chunk * ilen); // prod chunk
+            crossbeam::scope(|spawner| {
+                for ((w_chk, p_chk), d_chk) in w_chunks.zip(p_chunks).zip(d_chunks) {
+                    spawner.spawn(move |_| {
+                        for (j, &d) in d_chk.into_iter().enumerate() {
+                            // p[j] = w[j] * delta 
+                            for (&w, p) in slice_iter!(w_chk, ilen, j).zip(slice_iter_mut!(p_chk, ilen, j)) {
+                                *p = w * d;
+                            }
+                        }
+                    });
+                }
+            }).unwrap(); 
+        }
+
+        // add those slices back
+        use rayon::prelude::*;
+        let sum_prod = prod.par_chunks_mut(ilen).reduce_with(
+            |s1, s2| {
+                let len = s1.len();
+                for i in 0..len {
+                    let s = s1[i] + s2[i];
+                    s1[i] = s; s2[i] = s;
+                }
+                s1
+            }
+        ).unwrap();
+
         let mut lst_delta = Tensor::<T>::zeros(&self.input_shape);
+        lst_delta.flattened = sum_prod.to_vec();
+        
+        // dot product sigma-1(a^l) and w^Td^{l+1}
+        for (d, a) in lst_delta.flattened.iter_mut().zip(a_lst.flattened.iter()) {
+            *d *= sigma_lst.diff(*a);
+        }
+
         Ok(lst_delta)
     }
     fn descend(&mut self, rate: T, delta: &Tensor<T>, a: &Tensor<T>) -> Result<()> {
@@ -85,7 +147,7 @@ impl<T: NumT> Layer<T> for Dense<T> {
 }
 
 #[test]
-fn test_dense_predict() {
+fn test_dense_forward() {
     let input = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
         1., 7., 8.,
         -2., 3., 5.,
@@ -101,5 +163,29 @@ fn test_dense_predict() {
         activation: Activation::<f64>::No,
     };
     let output = Tensor::<f64>::new(&Shape::new([2]), vec![1., 7.]).unwrap();
-    assert_eq!(l.predict(&input).unwrap(), output);
+    assert_eq!(l.forward_propagate(&input, true).unwrap(), output);
+}
+
+#[test]
+fn test_dense_backpropagate() {
+    let lst_a = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
+        1., 7., 8.,
+        -2., 3., 5.,
+    ]).unwrap();
+    let l = Dense::<f64> {
+        input_shape: Shape::new([2, 3]),
+        output_shape: Shape::new([2]),
+        weight: vec![
+            2., 1., -1., 3., 2., 1.,
+            1., 0., 0., -2., 1., 0.,
+        ],
+        bias: vec![-5., -1.],
+        activation: Activation::<f64>::No,
+    };
+    let delta = Tensor::<f64>::new(&Shape::new([2]), vec![1., 7.]).unwrap();
+    let answer = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
+        9., 1., -1.,
+        0., 9., 1.,
+    ]).unwrap();
+    assert_eq!(l.backpropagate_delta(&delta, &lst_a, &Activation::<f64>::Relu).unwrap(), answer);
 }

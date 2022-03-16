@@ -21,7 +21,7 @@ impl<T: NumT> Model<T> for Sequential<T> {
         let mut output: Box<Tensor<T>> = Box::new((*input).clone());
         for layer in &self.seq {
             last_output = output;
-            output = Box::new(layer.predict(&last_output).unwrap());
+            output = Box::new(layer.forward_propagate(&last_output, true).unwrap());
         }
         Ok(*output)
     }
