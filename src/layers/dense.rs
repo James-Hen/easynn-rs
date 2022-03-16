@@ -3,6 +3,9 @@ use crate::layers::activation::*;
 
 extern crate crossbeam;
 extern crate num_cpus;
+extern crate rayon;
+
+use rayon::prelude::*;
 
 /// Weight are arranged in flattened style:
 /// every i^th consecutive (input size) items are the weight
@@ -86,6 +89,16 @@ impl<T: NumT> Layer<T> for Dense<T> {
         }
         Ok(output)
     }
+    fn activate(&self, output: &Tensor<T>) -> Result<Tensor<T>> {
+        if output.shape != self.output_shape {
+            return Err(ShapeMismatchError);
+        }
+        let mut act_vec = vec![T::zero(); output.shape.size()];
+        act_vec.par_iter_mut().zip(output.flattened.par_iter()).for_each(|(a, o)| {
+            *a = self.activation.call(*o);
+        });
+        Ok(Tensor::<T>::new(&self.output_shape, act_vec).unwrap())
+    }
     fn backpropagate_delta(&self, delta: &Tensor<T>, a_lst: &Tensor<T>, sigma_lst: &Activation<T>) -> Result<Tensor<T>> {
         if delta.shape != self.output_shape || a_lst.shape != self.input_shape {
             return Err(ShapeMismatchError);
@@ -116,7 +129,6 @@ impl<T: NumT> Layer<T> for Dense<T> {
         }
 
         // add those slices back
-        use rayon::prelude::*;
         let sum_prod = prod.par_chunks_mut(ilen).reduce_with(
             |s1, s2| {
                 let len = s1.len();
@@ -132,16 +144,44 @@ impl<T: NumT> Layer<T> for Dense<T> {
         lst_delta.flattened = sum_prod.to_vec();
         
         // dot product sigma-1(a^l) and w^Td^{l+1}
-        for (d, a) in lst_delta.flattened.iter_mut().zip(a_lst.flattened.iter()) {
+        lst_delta.flattened.par_iter_mut().zip(a_lst.flattened.par_iter()).for_each(|(d, a)| {
             *d *= sigma_lst.diff(*a);
-        }
+        });
 
         Ok(lst_delta)
     }
-    fn descend(&mut self, rate: T, delta: &Tensor<T>, a: &Tensor<T>) -> Result<()> {
-        if delta.shape != self.output_shape {
+    fn descend(&mut self, rate: T, delta: &Tensor<T>, a_lst: &Tensor<T>) -> Result<()> {
+        if delta.shape != self.output_shape || a_lst.shape != self.input_shape {
             return Err(ShapeMismatchError);
         }
+        // do weight update
+        let dlen = delta.flattened.len();
+        let alen = a_lst.flattened.len();
+
+        let threads = num_cpus::get();
+        let d_per_chunk = dlen / threads + 1;
+        {
+            let d_chunks = delta.flattened.chunks(d_per_chunk);
+            let w_chunks = self.weight.chunks_mut(d_per_chunk * alen);
+            crossbeam::scope(|spawner| {
+                for (d_chk, w_chk) in d_chunks.zip(w_chunks) {
+                    spawner.spawn(move |_| {
+                        for (j, d) in d_chk.into_iter().enumerate() {
+                            // Do w_chk[j] -= a * d[j]
+                            for (k, w) in slice_iter_mut!(w_chk, alen, j).enumerate() {
+                                *w -= rate * *d * a_lst.flattened[k];
+                            }
+                        }
+                    });
+                }
+            }).unwrap(); 
+        }
+
+        // do bias update
+        self.bias.par_iter_mut().zip(delta.flattened.par_iter()).for_each(|(b, d)| {
+            *b -= rate * *d;
+        });
+
         Ok(())
     }
 }
@@ -167,6 +207,28 @@ fn test_dense_forward() {
 }
 
 #[test]
+fn test_dense_activate() {
+    let l = Dense::<f64> {
+        input_shape: Shape::new([2, 3]),
+        output_shape: Shape::new([3, 4]),
+        weight: vec![0.; 12_usize],
+        bias: vec![0.; 12_usize],
+        activation: Activation::<f64>::Sigmoid,
+    };
+    let output = Tensor::<f64>::new(&Shape::new([3, 4]), vec![
+        -3., -2., -1., 0.,
+        1., 2., 3., 4.,
+        5., 6., 7., 8.,
+    ]).unwrap();
+    let mut ans_vec = vec![0.; 12];
+    for (y, x) in ans_vec.iter_mut().zip(output.flattened.iter()) {
+        *y = Activation::<f64>::Sigmoid.call(*x);
+    }
+    let answer = Tensor::<f64>::new(&Shape::new([3, 4]), ans_vec).unwrap();
+    assert_eq!(l.activate(&output).unwrap(), answer);
+}
+
+#[test]
 fn test_dense_backpropagate() {
     let lst_a = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
         1., 7., 8.,
@@ -188,4 +250,42 @@ fn test_dense_backpropagate() {
         0., 9., 1.,
     ]).unwrap();
     assert_eq!(l.backpropagate_delta(&delta, &lst_a, &Activation::<f64>::Relu).unwrap(), answer);
+}
+
+#[test]
+fn test_dense_descend() {
+    let lst_a = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
+        1., 7., 8.,
+        -2., 3., 5.,
+    ]).unwrap();
+    let mut l = Dense::<f64> {
+        input_shape: Shape::new([2, 3]),
+        output_shape: Shape::new([2]),
+        weight: vec![
+            2., 1., -1., 3., 2., 1.,
+            1., 0., 0., -2., 1., 0.,
+        ],
+        bias: vec![-5., -1.],
+        activation: Activation::<f64>::No,
+    };
+    let delta = Tensor::<f64>::new(&Shape::new([2]), vec![1., 7.]).unwrap();
+    l.descend(0.1, &delta, &lst_a).unwrap();
+    let w_ans = vec![
+        2.-0.1, 1.-0.7, -1.-0.8, 3.+0.2, 2.-0.3, 1.-0.5,
+        1.-0.7, 0.-4.9, 0.-5.6, -2.+1.4, 1.-2.1, 0.-3.5,
+    ];
+    let b_ans = vec![-5.-0.1, -1.-0.7];
+    let eps = 1e-8;
+    for (w, upd) in w_ans.into_iter().zip(l.weight.into_iter()) {
+        assert!(
+            (w - upd).abs() < eps,
+            "expected {}, got {}", w, upd
+        );
+    }
+    for (b, upd) in b_ans.into_iter().zip(l.bias.into_iter()) {
+        assert!(
+            (b - upd).abs() < eps,
+            "expected {}, got {}", b, upd
+        );
+    }
 }
