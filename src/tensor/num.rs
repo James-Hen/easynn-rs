@@ -7,11 +7,11 @@ use num_traits::identities::{ One, Zero };
 
 use std::ops::{ Neg };
 use std::marker::{ Send, Sync };
-use std::fmt::Debug;
+use std::fmt::{ Debug, Display };
 
 pub trait NumT:
     PartialEq + PartialOrd + Zero + One + NumOps + NumAssignOps
-    + Copy + Send + Sync + Debug + Neg + Float
+    + Copy + Send + Sync + Debug + Display + Neg + Float
 { }
 
 macro_rules! trait_impl {

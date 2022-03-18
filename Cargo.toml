@@ -15,7 +15,9 @@ description = """
 keywords = ["CNN-RNN-DNN", "backpropagation", "parallel" ,"machine-learning"]
 
 [dependencies]
+itertools = "0.10.2"
 num-traits = "0.2.14"
 rayon = "1.5"
 crossbeam = "0.8.1"
 num_cpus = "1.13.1"
+rand = "0.8.5"

@@ -47,14 +47,14 @@ impl<T: NumT> Tensor<T> {
         Ok(ind)
     }
 
-    pub fn new(shape: &Shape, flattened: Vec<T>) -> std::result::Result<Self, ShapeMismatchError> {
+    pub fn new(shape: &Shape, flattened: Vec<T>) -> Self {
         if flattened.len() != shape.size() {
-            return Err(ShapeMismatchError)
+            panic!("Shape mismatch!")
         }
-        Ok(Tensor {
+        Tensor {
             flattened: flattened,
             shape: shape.clone(),
-        })
+        }
     }
     pub fn zeros(shape: &Shape) -> Self {
         Tensor::<T> { flattened: vec![T::zero(); shape.size()], shape: shape.clone(), }
@@ -62,14 +62,13 @@ impl<T: NumT> Tensor<T> {
     pub fn ones(shape: &Shape) -> Self {
         Tensor::<T> { flattened: vec![T::one(); shape.size()], shape: shape.clone(), }
     }
-    pub fn get<const RANK: usize>(&self, at: TensorIndex<RANK>) -> Result<T> {
-        let pos = self.index2pos(at)?;
-        Ok(self.flattened[pos])
+    pub fn get<const RANK: usize>(&self, at: TensorIndex<RANK>) -> T {
+        let pos = self.index2pos(at).unwrap();
+        self.flattened[pos]
     }
-    pub fn set<const RANK: usize>(&mut self, at: TensorIndex<RANK>, val: T) -> Result<()> {
-        let pos = self.index2pos(at)?;
+    pub fn set<const RANK: usize>(&mut self, at: TensorIndex<RANK>, val: T) {
+        let pos = self.index2pos(at).unwrap();
         self.flattened[pos] = val;
-        Ok(())
     }
     pub fn get_shape(&self) -> &Shape {
         &self.shape

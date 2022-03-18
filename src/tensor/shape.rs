@@ -36,3 +36,10 @@ impl Shape {
         ret
     }
 }
+
+#[macro_export]
+macro_rules! sh {
+    ($t: tt) => {
+        &Shape::new($t)
+    }
+}
