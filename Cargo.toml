@@ -4,7 +4,7 @@ version = "0.1.4-beta"
 edition = "2021"
 authors = ["Junyang Zhang <mail@junyang.me>"]
 repository = "https://github.com/junyang-zh/easynn-rs"
-documentation = "https://docs.rs/easynn/0.1.3-alpha/easynn/"
+documentation = "https://docs.rs/easynn/"
 license = "MIT"
 readme = "README.md"
 
