@@ -40,7 +40,7 @@
 //! 
 //!     // train the model
 //!     for _i in 0..10 {
-//!         nn.train_once(&inputs, &outputs, 100, 0.1, true);
+//!         nn.train_once(&inputs, &outputs, 100, 0.1, false);
 //!     }
 //! 
 //!     // evaluate the model
@@ -48,12 +48,12 @@
 //!     let test_in2: u32 = 1145141919;
 //!     let test_out: u32 = target_func(test_in1, test_in2);
 //!     let test_res = nn.predict(&Tensor::new(sh!([2]), vec![test_in1 as f64, test_in2 as f64])).unwrap().get([0]);
-//!     dbg!("The prediction of input\n\t{:b} and\n\t{:b} is\n\t{:b} , expected\n\t{:b}"
+//!     println!("The prediction of input\n\t{:b} and\n\t{:b} is\n\t{:b} , expected\n\t{:b}"
 //!         , test_in1, test_in2, test_res.floor() as u32, test_out);
 //! ```
 //! 
 //! ## Supported models
-//!  - [ ] `Sequential`: similar to [The Sequential model](https://www.tensorflow.org/guide/keras/sequential_model) of [Keras](https://keras.io/)
+//!  - [x] `Sequential`: similar to [The Sequential model](https://www.tensorflow.org/guide/keras/sequential_model) of [Keras](https://keras.io/)
 //!
 //! ## Supported layer types
 //!  - Primitive types:

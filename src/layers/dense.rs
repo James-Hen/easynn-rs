@@ -6,6 +6,23 @@ extern crate num_cpus;
 extern crate rayon;
 
 use rayon::prelude::*;
+use rand::Rng;
+
+use std::cmp;
+
+/// This is used to determine how much threads to spawn.
+/// 
+/// The length argument is the count of total works (e.g. mul counts)
+///
+/// Need to consider SIMD.
+fn determine_thread(len: usize) -> usize {
+    const FALL_BACK_SIZE: usize = 256;
+    let ncpu = num_cpus::get();
+    if len / ncpu < FALL_BACK_SIZE {
+        return 1;
+    }
+    cmp::min(ncpu, len / FALL_BACK_SIZE)
+}
 
 /// Weight are arranged in flattened style:
 /// every i^th consecutive (input size) items are the weight
@@ -22,22 +39,23 @@ use rayon::prelude::*;
 /// 
 #[derive(Debug)]
 pub struct Dense<T: NumT> {
-    input_shape: Shape,
-    output_shape: Shape,
-    weight: Vec<T>,
-    bias: Vec<T>,
-    activation: Activation<T>,
+    pub(crate) input_shape: Shape,
+    pub(crate) output_shape: Shape,
+    pub(crate) weight: Vec<T>,
+    pub(crate) bias: Vec<T>,
+    pub(crate) activation: Activation<T>,
 }
 
 impl<T: NumT> Dense<T> {
     pub fn new(i_shape: &Shape, o_shape: &Shape, act: Activation<T>) -> Self {
         let ilen = i_shape.size();
         let olen = o_shape.size();
+        let mut rng = rand::thread_rng();
         Dense::<T> {
             input_shape: i_shape.clone(),
             output_shape: o_shape.clone(),
-            weight: vec![T::one(); ilen * olen],
-            bias: vec![T::one(); olen],
+            weight: (0..ilen*olen).map(|_| T::from(rng.gen_range(0.0..=1.0)).unwrap()).collect(),
+            bias: (0..olen).map(|_| T::from(rng.gen_range(0.0..=1.0)).unwrap()).collect(),
             activation: act,
         }
     }
@@ -78,7 +96,7 @@ impl<T: NumT> Layer<T> for Dense<T> {
         let olen = output.flattened.len();
         let ilen = input.flattened.len();
 
-        let threads = num_cpus::get();
+        let threads = determine_thread(ilen * olen);
         let mults_per_chunk = olen / threads + 1;
         {
             let o_chunks = output.flattened.chunks_mut(mults_per_chunk);
@@ -121,7 +139,7 @@ impl<T: NumT> Layer<T> for Dense<T> {
 
         // calculate products of weight and delta, to be sumed
         let mut prod = vec![T::zero(); self.weight.len()];
-        let threads = num_cpus::get();
+        let threads = determine_thread(ilen * dlen);
         let mults_per_chunk = dlen / threads + 1;
         {
             let d_chunks = delta.flattened.chunks(mults_per_chunk); // delta chunk
@@ -156,7 +174,7 @@ impl<T: NumT> Layer<T> for Dense<T> {
         let mut lst_delta = Tensor::<T>::zeros(&self.input_shape);
         lst_delta.flattened = sum_prod.to_vec();
         
-        // dot product sigma-1(a^l) and w^Td^{l+1}
+        // dot product sigma-1(z^l) and w^Td^{l+1}
         lst_delta.flattened.par_iter_mut().zip(z_lst.flattened.par_iter()).for_each(|(d, z)| {
             *d *= sigma_lst.diff(*z);
         });
@@ -170,7 +188,7 @@ impl<T: NumT> Layer<T> for Dense<T> {
         // compute d dot a^T
         let dlen = delta.flattened.len();
         let alen = a_lst.flattened.len();
-        let threads = num_cpus::get();
+        let threads = determine_thread(dlen * alen);
         let d_per_chunk = dlen / threads + 1;
         {
             let d_chunks = delta.flattened.chunks(d_per_chunk);
@@ -298,7 +316,7 @@ fn test_dense_descend() {
         activation: Activation::<f64>::No,
     };
     let delta = Tensor::<f64>::new(&Shape::new([2]), vec![1., 7.]);
-    l.descend(0.1, &da_lst, &delta);
+    l.descend(0.1, &da_lst, &delta).unwrap();
     let w_ans = vec![
         2.-0.1, 1.-0.7, -1.-0.8, 3.+0.2, 2.-0.3, 1.-0.5,
         1.-0.7, 0.-4.9, 0.-5.6, -2.+1.4, 1.-2.1, 0.-3.5,
@@ -317,4 +335,35 @@ fn test_dense_descend() {
             "expected {}, got {}", b, upd
         );
     }
+}
+
+#[test]
+fn test_add_weight_delta_to() {
+    let a_lst = Tensor::<f64>::new(&Shape::new([2, 3]), vec![
+        1., 7., 8.,
+        -2., 3., 5.,
+    ]);
+    let l = Dense::<f64> {
+        input_shape: Shape::new([2, 3]),
+        output_shape: Shape::new([2]),
+        weight: vec![
+            2., 1., -1., 3., 2., 1.,
+            1., 0., 0., -2., 1., 0.,
+        ],
+        bias: vec![-5., -1.],
+        activation: Activation::<f64>::No,
+    };
+    let delta = Tensor::<f64>::new(&Shape::new([2]), vec![1., 7.]);
+    let mut cum_dw = vec![0.; 12];
+    let mut cum_db = Tensor::<f64>::new(&Shape::new([2]), vec![0., 0.]);
+    l.add_weight_delta_to(&delta, &a_lst, &mut cum_dw, &mut cum_db).unwrap();
+    let ans_da_lst = vec![
+        1., 7., 8.,
+        -2., 3., 5.,
+        
+        7., 49., 56.,
+        -14., 21., 35.,
+    ];
+    assert_eq!(cum_dw, ans_da_lst);
+    assert_eq!(cum_db, delta);
 }

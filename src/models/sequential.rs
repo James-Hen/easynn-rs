@@ -61,6 +61,9 @@ impl<T: NumT> Model<T> for Sequential<T> {
         Ok((d_lrev, a_lst))
     }
     fn update_delta_da(&self, cum_dw: &mut Vec<Vec<T>>, cum_db: &mut Vec<Tensor<T>>, delta: &Vec<Tensor<T>>, a_lst: &Vec<Tensor<T>>) {
+        // assert_eq!(cum_dw.len(), cum_db.len());
+        // assert_eq!(delta.len(), a_lst.len());
+        // assert_eq!(delta.len(), cum_db.len());
         for (layer, ((d, alst), (cumdw, cumdb))) in self.seq.iter().zip(
             delta.iter().zip(a_lst.iter()).zip(
                 cum_dw.iter_mut().zip(cum_db.iter_mut())
@@ -70,6 +73,8 @@ impl<T: NumT> Model<T> for Sequential<T> {
         }
     }
     fn descend(&mut self, rate: T, dw: &Vec<Vec<T>>, db: &Vec<Tensor<T>>) {
+        // assert_eq!(dw.len(), self.seq.len());
+        // assert_eq!(db.len(), self.seq.len());
         for (layer, (dwi, dbi)) in self.seq.iter_mut().zip(dw.iter().zip(db.iter())) {
             layer.descend(rate, dwi, dbi).unwrap();
         }
@@ -104,6 +109,8 @@ impl<T: NumT> Model<T> for Sequential<T> {
             for (input, truth) in in_batch.into_iter().zip(tr_batch.into_iter()) {
                 let (deltas, mut interoutputs) = self.propagate_sample(input, truth).unwrap();
                 let result = interoutputs.pop().unwrap();
+                // print!("Input: {:?}; Truth: {:?}; Result: {:?}", input.flattened, truth.flattened, result.flattened);
+                // println!("; dL: {:?}", deltas.last().unwrap().flattened);
                 tot_loss += self.loss.call(&result, truth).unwrap();
                 self.update_delta_da(&mut cum_dw, &mut cum_db, &deltas, &interoutputs);
             }
@@ -138,8 +145,24 @@ fn test_sequential_predict() {
 
     let mut nn = Sequential::<f64>::new(Loss::MeanSquare);
     use crate::layers::activation::Activation::*;
-    nn.add(crate::layers::dense::Dense::<f64>::new(&i_shape, &hid_shape, No));
-    nn.add(crate::layers::dense::Dense::<f64>::new(&hid_shape, &o_shape, Relu));
+
+    let l1 = crate::layers::dense::Dense::<f64> {
+        input_shape: i_shape.clone(),
+        output_shape: hid_shape.clone(),
+        weight: vec![1.; 18],
+        bias: vec![1.; 3],
+        activation: Activation::<f64>::No,
+    };
+    let l2 = crate::layers::dense::Dense::<f64> {
+        input_shape: hid_shape.clone(),
+        output_shape: o_shape.clone(),
+        weight: vec![1.; 6],
+        bias: vec![1.; 2],
+        activation: Activation::<f64>::No,
+    };
+
+    nn.add(l1);
+    nn.add(l2);
 
     assert_eq!(nn.predict(&input).unwrap(), output);
 }
@@ -153,35 +176,35 @@ fn test_sequential_xor1() {
     // create the network and add 2 layers
     let mut nn = Sequential::<f64>::new(Loss::MeanSquare);
     // add the input (2 integers) and a hidden layer
-    nn.add(Dense::<f64>::new(sh!([2]), sh!([2]), Activation::Sigmoid));
+    nn.add(Dense::<f64>::new(sh!([2]), sh!([10]), Activation::Relu));
+    nn.add(Dense::<f64>::new(sh!([10]), sh!([2]), Activation::Relu));
     // add the output layer
-    nn.add(Dense::<f64>::new(sh!([2]), sh!([1]), Activation::Sigmoid));
+    nn.add(Dense::<f64>::new(sh!([2]), sh!([1]), Activation::Relu));
 
     // create the training set
-    let mut rng = rand::thread_rng();
-    let tot_samples: usize = 100;
-    let mut inputs = vec![Tensor::new(sh!([2]), vec![0_f64, 0_f64]); tot_samples];
-    let mut outputs = vec![Tensor::new(sh!([1]), vec![0_f64]); tot_samples];
-    for (i, o) in inputs.iter_mut().zip(outputs.iter_mut()) {
-        let a = rng.gen::<u32>();
-        let b = rng.gen::<u32>();
-        i.set([0], (a & 1) as f64);
-        i.set([1], (b & 1) as f64);
-        o.set([0], ((a ^ b) & 1).into());
-    }
+    let inputs = vec![
+        Tensor::new(sh!([2]), vec![0., 0.]),
+        Tensor::new(sh!([2]), vec![1., 0.]),
+        Tensor::new(sh!([2]), vec![0., 1.]),
+        Tensor::new(sh!([2]), vec![1., 1.]),
+    ];
+    let outputs = vec![
+        Tensor::new(sh!([1]), vec![0.]),
+        Tensor::new(sh!([1]), vec![1.]),
+        Tensor::new(sh!([1]), vec![1.]),
+        Tensor::new(sh!([1]), vec![0.]),
+    ];
 
     // train the model
-    for i in 0..50 {
+    for i in 0..1000 {
         println!("[Epoch {}]", i);
-        nn.train_once(&inputs, &outputs, 10, 0.1, true);
+        nn.train_once(&inputs, &outputs, 1, 0.01, true);
     }
 
     // evaluate the model
-    let test_in1 = [0., 1., 0., 1.];
-    let test_in2 = [0., 0., 1., 1.];
-    let test_out = [0., 1., 1., 0.];
-    for ((i1, i2), o) in test_in1.iter().zip(test_in2.iter()).zip(test_out.iter()) {
-        let test_res = nn.predict(&Tensor::new(sh!([2]), vec![*i1, *i2])).unwrap().get([0]);
-        assert_eq!(test_res.round(), *o);
+    let mut result = [0.; 4];
+    for (n, input) in inputs.iter().enumerate() {
+        result[n] = nn.predict(&input).unwrap().get([0]).round();
     }
+    assert_eq!(result.to_vec(), outputs.iter().map(|t| t.flattened[0]).collect::<Vec<f64>>());
 }

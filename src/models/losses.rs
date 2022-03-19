@@ -16,7 +16,7 @@ fn mse<T: NumT>(output: &Tensor::<T>, truth: &Tensor::<T>) -> Result<T> {
     let mut ret = T::zero();
     let len = T::from(output.shape.size()).unwrap();
     for (o, t) in output.flattened.iter().zip(truth.flattened.iter()) {
-        ret += (*o - *t).powf(T::one()+T::one());
+        ret += (*o - *t) * (*o - *t);
     }
     Ok(ret.sqrt() / len)
 }
@@ -28,7 +28,7 @@ fn dmse<T: NumT>(output: &Tensor::<T>, truth: &Tensor::<T>) -> Result<Tensor::<T
     let mut ret = Tensor::<T>::zeros(&truth.shape);
     let len = T::from(output.shape.size()).unwrap();
     for (r, (o, t)) in ret.flattened.iter_mut().zip(output.flattened.iter().zip(truth.flattened.iter())) {
-        *r = (*o - *t) * *o * (T::one()+T::one()) / len;
+        *r = (*o - *t) * (T::one()+T::one()) / len;
     }
     Ok(ret)
 }
