@@ -12,7 +12,7 @@ description = """
 A rust crate for quick-and-dirty neuro network developing and training.
 """
 
-keywords = ["feedforward-neuro-network", "backpropagation", "parallel" ,"machine-learning"]
+keywords = ["feedforward-nn", "backpropagation", "parallel" ,"machine-learning"]
 
 [dependencies]
 itertools = "0.10.2"
