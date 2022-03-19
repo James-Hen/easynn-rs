@@ -3,7 +3,7 @@
 This crate aims to provide neuro network developing and training utilities
 in rust, where a variety of models and layers are supported.
 
-Note: this crate is currently in pre-alpha, any interface is subject to change.
+Note: this crate is currently in beta, any interface is subject to change.
 
 ### Xor Example
 

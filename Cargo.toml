@@ -1,6 +1,6 @@
 [package]
 name = "easynn"
-version = "0.1.3-alpha"
+version = "0.1.4-beta"
 edition = "2021"
 authors = ["Junyang Zhang <mail@junyang.me>"]
 repository = "https://github.com/junyang-zh/easynn-rs"
@@ -9,10 +9,10 @@ license = "MIT"
 readme = "README.md"
 
 description = """
-(Pre-alpha) A rust crate for quick-and-dirty neuro network developing and training.
+A rust crate for quick-and-dirty neuro network developing and training.
 """
 
-keywords = ["CNN-RNN-DNN", "backpropagation", "parallel" ,"machine-learning"]
+keywords = ["feedforward-neuro-network", "backpropagation", "parallel" ,"machine-learning"]
 
 [dependencies]
 itertools = "0.10.2"
