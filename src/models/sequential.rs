@@ -10,7 +10,7 @@ use crate::layers::*;
 
 pub struct Sequential<T: NumT> {
     seq: Vec<Box<dyn Layer<T>>>,
-    loss: Loss,
+    pub loss: Loss,
 }
 
 impl<T: NumT> Sequential<T> {

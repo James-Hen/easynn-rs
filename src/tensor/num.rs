@@ -12,6 +12,7 @@ use std::fmt::{ Debug, Display };
 pub trait NumT:
     PartialEq + PartialOrd + Zero + One + NumOps + NumAssignOps
     + Copy + Send + Sync + Debug + Display + Neg + Float
+    + std::iter::Sum
 { }
 
 macro_rules! trait_impl {

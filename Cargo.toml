@@ -1,6 +1,6 @@
 [package]
 name = "easynn"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 edition = "2021"
 authors = ["Junyang Zhang <mail@junyang.me>"]
 repository = "https://github.com/junyang-zh/easynn-rs"
@@ -13,6 +13,12 @@ A rust crate for quick-and-dirty neuro network developing and training.
 """
 
 keywords = ["feedforward-nn", "backpropagation", "parallel" ,"machine-learning"]
+
+[workspace]
+
+members = [
+    "fashion_mnist_test",
+]
 
 [dependencies]
 itertools = "0.10.2"
