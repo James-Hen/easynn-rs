@@ -78,9 +78,9 @@ fn main() {
     tproc.epoch_times.push(start.elapsed().as_nanos());
 
     // train the model
-    for e in 0..100 {
+    for e in 0..5 {
         println!("[Epoch {}]", e);
-        let train_loss = nn.train_once(&train_ims, &train_lbs, 2048, 1e-18, true);
+        let train_loss = nn.train_once(&train_ims, &train_lbs, 2048, 1e-3, true);
         let test_loss = nn.evaluate(&test_ims, &test_lbs);
         tproc.train_losses.push(train_loss);
         tproc.test_losses.push(test_loss);

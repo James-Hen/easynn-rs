@@ -18,7 +18,7 @@ fn mse<T: NumT>(output: &Tensor::<T>, truth: &Tensor::<T>) -> Result<T> {
     for (o, t) in output.flattened.iter().zip(truth.flattened.iter()) {
         ret += (*o - *t) * (*o - *t);
     }
-    Ok(ret.sqrt() / len)
+    Ok(ret / len)
 }
 
 fn dmse<T: NumT>(output: &Tensor::<T>, truth: &Tensor::<T>) -> Result<Tensor::<T>> {

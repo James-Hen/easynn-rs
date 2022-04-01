@@ -54,8 +54,8 @@ impl<T: NumT> Dense<T> {
         Dense::<T> {
             input_shape: i_shape.clone(),
             output_shape: o_shape.clone(),
-            weight: (0..ilen*olen).map(|_| T::from(rng.gen_range(0.0..=1.0)).unwrap()).collect(),
-            bias: (0..olen).map(|_| T::from(rng.gen_range(0.0..=1.0)).unwrap()).collect(),
+            weight: (0..ilen*olen).map(|_| T::from(rng.gen_range(-0.1..=0.1)).unwrap()).collect(),
+            bias: (0..olen).map(|_| T::from(rng.gen_range(-0.1..=0.1)).unwrap()).collect(),
             activation: act,
         }
     }

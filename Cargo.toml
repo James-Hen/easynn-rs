@@ -1,6 +1,6 @@
 [package]
 name = "easynn"
-version = "0.1.5-beta"
+version = "0.1.6-beta"
 edition = "2021"
 authors = ["Junyang Zhang <mail@junyang.me>"]
 repository = "https://github.com/junyang-zh/easynn-rs"
