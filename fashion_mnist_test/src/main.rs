@@ -1,14 +1,27 @@
 extern crate easynn;
 extern crate rust_mnist;
+extern crate serde;
+extern crate serde_json;
 
 use easynn::prelude::*;
 use rust_mnist::{print_sample_image, Mnist};
+use serde::{ Deserialize, Serialize };
+use std::fs::File;
+use std::io::prelude::*;
+use std::time::{ Duration, Instant };
+
+#[derive(Serialize, Deserialize)]
+struct TrainingProc {
+    train_losses: Vec<f64>,
+    test_losses: Vec<f64>,
+    epoch_times: Vec<u128>,
+}
 
 fn get_data(path: &str) -> (Vec::<Tensor<f64>>, Vec::<Tensor<f64>>, Vec::<Tensor<f64>>, Vec::<Tensor<f64>>) {
     // create the training set
     let mnist = Mnist::new(path);
     // Print one image (the one at index 5) for verification.
-    print_sample_image(&mnist.train_data[5], mnist.train_labels[5]);
+    // print_sample_image(&mnist.train_data[5], mnist.train_labels[5]);
     let mut train_ims = Vec::<Tensor<f64>>::new();      // images
     let mut train_lbs = Vec::<Tensor<f64>>::new();      // one-hot classifications
     let mut test_ims = Vec::<Tensor<f64>>::new();      // images
@@ -41,6 +54,8 @@ fn get_data(path: &str) -> (Vec::<Tensor<f64>>, Vec::<Tensor<f64>>, Vec::<Tensor
 }
 
 fn main() {
+    let start = Instant::now();
+
     // create the network and add 4 layers
     let mut nn = Sequential::<f64>::new(Loss::MeanSquare);
     // add the input (2 integers) and a hidden layer
@@ -55,18 +70,29 @@ fn main() {
     // Please download the dataset to the directory
     let (train_ims, train_lbs, test_ims, test_lbs) = get_data("../data/FashionMNIST/raw/");
 
+    let mut tproc = TrainingProc {
+        train_losses: Vec::<f64>::new(),
+        test_losses: Vec::<f64>::new(),
+        epoch_times: Vec::<u128>::new(),
+    };
+    tproc.epoch_times.push(start.elapsed().as_nanos());
+
     // train the model
-    for e in 0..2 {
+    for e in 0..100 {
         println!("[Epoch {}]", e);
-        nn.train_once(&train_ims, &train_lbs, 512, 0.01, true);
+        let train_loss = nn.train_once(&train_ims, &train_lbs, 2048, 1e-18, true);
+        let test_loss = nn.evaluate(&test_ims, &test_lbs);
+        tproc.train_losses.push(train_loss);
+        tproc.test_losses.push(test_loss);
+        let cur_nanos = start.elapsed().as_nanos();
+        tproc.epoch_times.push(cur_nanos);
+        println!("Average training loss: {}", test_loss);
+        println!("Average test loss: {}", test_loss);
+        println!("Average test loss: {}", test_loss);
+        println!("Current run time (s): {}", cur_nanos / 1e9 as u128);
     }
 
-    // evaluate the model
-    let mut loss = 0.;
-    for (im, lb) in test_ims.iter().zip(test_lbs.iter()) {
-        let pred_lb = nn.predict(&im).unwrap();
-        loss += nn.loss.call(&lb, &pred_lb).unwrap();
-    }
-    loss /= test_ims.len() as f64;
-    println!("The final test average loss is {}", loss);
+    let tprocjson = serde_json::to_string(&tproc).unwrap();
+    let mut file = File::create("./results/torch_results.json").unwrap();
+    file.write_all(tprocjson.as_bytes()).unwrap();
 }

@@ -21,6 +21,8 @@ pub trait Model<T: NumT>  {
     /// Descend
     fn descend(&mut self, rate: T, dw: &Vec<Vec<T>>, db: &Vec<Tensor<T>>);
     
-    /// Trains the model given the dataset by an epoch
-    fn train_once(&mut self, inputs: &Vec<Tensor<T>>, truths: &Vec<Tensor<T>>, batch_size: usize, learning_rate: T, verbose: bool);
+    /// Evaluate the model and return the loss
+    fn evaluate(&self, inputs: &Vec<Tensor<T>>, truths: &Vec<Tensor<T>>) -> T;
+    /// Trains the model given the dataset by an epoch and return the loss
+    fn train_once(&mut self, inputs: &Vec<Tensor<T>>, truths: &Vec<Tensor<T>>, batch_size: usize, learning_rate: T, verbose: bool) -> T;
 }

@@ -79,7 +79,15 @@ impl<T: NumT> Model<T> for Sequential<T> {
             layer.descend(rate, dwi, dbi).unwrap();
         }
     }
-    fn train_once(&mut self, inputs: &Vec<Tensor<T>>, truths: &Vec<Tensor<T>>, batch_size: usize, learning_rate: T, verbose: bool) {
+    fn evaluate(&self, inputs: &Vec<Tensor<T>>, truths: &Vec<Tensor<T>>) -> T {
+        let mut avg_loss = T::zero();
+        for (input, truth) in inputs.iter().zip(truths.iter()) {
+            let pred = self.predict(input).unwrap();
+            avg_loss += self.loss.call(&pred, &truth).unwrap();
+        }
+        avg_loss / T::from(inputs.len()).unwrap()
+    }
+    fn train_once(&mut self, inputs: &Vec<Tensor<T>>, truths: &Vec<Tensor<T>>, batch_size: usize, learning_rate: T, verbose: bool) -> T {
         // prepare the intermediate accumulators
         let mut cum_dw = Vec::<Vec<T>>::new();
         let mut cum_db = Vec::<Tensor<T>>::new();
@@ -91,13 +99,16 @@ impl<T: NumT> Model<T> for Sequential<T> {
         // assert_eq!(inputs.len(), truths.len());
         let in_batches = inputs.chunks(batch_size);
         let tr_batches = truths.chunks(batch_size);
+        let mut avg_loss = T::zero();
+        let tot_batches = in_batches.len();
         for (i, (in_batch, tr_batch)) in in_batches.into_iter().zip(tr_batches.into_iter()).enumerate() {
             let mut tot_loss = T::zero();
             if verbose {
                 print!("Trainning batch {} ... ", i);
             }
             // batch size
-            let bsize = T::from(in_batch.len()).unwrap();
+            let batch_size = in_batch.len();
+            let bsize_t = T::from(batch_size).unwrap();
             // clear the cumulators
             for cum_dw_l in &mut cum_dw {
                 cum_dw_l.par_iter_mut().for_each(|cdw| { *cdw = T::zero(); });
@@ -114,20 +125,16 @@ impl<T: NumT> Model<T> for Sequential<T> {
                 tot_loss += self.loss.call(&result, truth).unwrap();
                 self.update_delta_da(&mut cum_dw, &mut cum_db, &deltas, &interoutputs);
             }
-            // process the cumulators
-            for cum_dw_l in &mut cum_dw {
-                cum_dw_l.par_iter_mut().for_each(|cdw| { *cdw *= T::one() / bsize; });
-            }
-            for cum_db_l in &mut cum_db {
-                cum_db_l.flattened.par_iter_mut().for_each(|cdb| { *cdb *= T::one() / bsize; });
-            }
+
             // descend
-            self.descend(learning_rate, &cum_dw, &cum_db);
+            self.descend(learning_rate / bsize_t, &cum_dw, &cum_db);
 
             if verbose {
-                println!("Ok, Mean loss ({:?}): {}", self.loss, tot_loss / bsize);
+                println!("Ok, Mean loss ({:?}): {}", self.loss, tot_loss / bsize_t);
             }
+            avg_loss += tot_loss / bsize_t;
         }
+        avg_loss / T::from(tot_batches).unwrap()
     }
 }
 
